@@ -1,0 +1,32 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-uploader-job
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: aws-cli
+        image: amazon/aws-cli:latest
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: "test"
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "test"
+        - name: AWS_DEFAULT_REGION
+          value: "us-east-1"
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "--- Creando reporte interno en el Pod ---"
+          echo "Reporte de telemetría generado a las $(date)" > /tmp/reporte.txt
+          
+          echo "--- Verificando/Creando Bucket S3 en LocalStack ---"
+          aws --endpoint-url=http://localstack-service:4566 s3 mb s3://reportes-cluster || true
+          
+          echo "--- Subiendo archivo a S3 via DNS interno ---"
+          aws --endpoint-url=http://localstack-service:4566 s3 cp /tmp/reporte.txt s3://reportes-cluster/reporte-$(date +%s).txt
+          
+          echo "--- Proceso completado con éxito ---"
