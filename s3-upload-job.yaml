@@ -17,11 +17,16 @@ spec:
           value: "test"
         - name: AWS_DEFAULT_REGION
           value: "us-east-1"
+        # ⬇️ VARIABLES CLAVE PARA DESACTIVAR X-AMZ-TRAILER EN LOCALSTACK ⬇️
+        - name: AWS_REQUEST_CHECKSUM_CALCULATION
+          value: "WHEN_REQUIRED"
+        - name: AWS_RESPONSE_CHECKSUM_VALIDATION
+          value: "WHEN_REQUIRED"
         command: ["/bin/sh", "-c"]
         args:
         - |
           echo "--- Creando reporte interno en el Pod ---"
-          echo "Reporte de telemetría generado a las $(date)" > /tmp/reporte.txt
+          echo "Reporte de telemetria generado a las $(date)" > /tmp/reporte.txt
           
           echo "--- Verificando/Creando Bucket S3 en LocalStack ---"
           aws --endpoint-url=http://localstack-service:4566 s3 mb s3://reportes-cluster || true
@@ -29,4 +34,4 @@ spec:
           echo "--- Subiendo archivo a S3 via DNS interno ---"
           aws --endpoint-url=http://localstack-service:4566 s3 cp /tmp/reporte.txt s3://reportes-cluster/reporte-$(date +%s).txt
           
-          echo "--- Proceso completado con éxito ---"
+          echo "--- Proceso completado con exito ---"
