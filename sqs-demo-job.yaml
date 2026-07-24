@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sqs-demo-job
+  namespace: default
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: aws-cli
+        image: amazon/aws-cli:latest
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          value: "test"
+        - name: AWS_SECRET_ACCESS_KEY
+          value: "test"
+        - name: AWS_DEFAULT_REGION
+          value: "us-east-1"
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          ENDPOINT="http://localstack-service:4566"
+
+          echo "--- 1. Creando la cola SQS 'eventos-queue' ---"
+          QUEUE_URL=$(aws --endpoint-url=$ENDPOINT sqs create-queue --queue-name eventos-queue --query 'QueueUrl' --output text)
+          echo "Cola lista en: $QUEUE_URL"
+
+          echo "--- 2. Productor: Publicando evento ORDER_CREATED ---"
+          aws --endpoint-url=$ENDPOINT sqs send-message \
+            --queue-url "$QUEUE_URL" \
+            --message-body '{"event": "ORDER_CREATED", "orderId": "ORD-2026-99", "monto": 1450.00, "moneda": "MXN"}'
+
+          echo "--- 3. Consumidor: Leyendo evento de la cola ---"
+          RESPONSE=$(aws --endpoint-url=$ENDPOINT sqs receive-message --queue-url "$QUEUE_URL")
+          echo "Mensaje extraido de SQS:"
+          echo "$RESPONSE"
+
+          echo "--- 4. Confirmando y eliminando mensaje procesado ---"
+          RECEIPT_HANDLE=$(echo "$RESPONSE" | grep -o '"ReceiptHandle": "[^"]*' | cut -d'"' -f4 || true)
+          if [ -n "$RECEIPT_HANDLE" ]; then
+            aws --endpoint-url=$ENDPOINT sqs delete-message --queue-url "$QUEUE_URL" --receipt-handle "$RECEIPT_HANDLE"
+            echo "Evento confirmado y eliminado de SQS con exito."
+          fi
+
+          echo "--- Pipeline EDA completado ---"
